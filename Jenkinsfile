@@ -2,10 +2,6 @@ pipeline {
 
     agent any
 
-    options {
-        skipDefaultCheckout(true)
-    }
-
     environment {
         DOCKER_IMAGE = 'karthik7756/financial-transaction-app'
         SONAR_PROJECT = 'financial-transaction-app'
@@ -15,29 +11,24 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo '=== CHECKOUT FROM GITHUB ==='
-                checkout scm
+                echo 'Checking out source code from GitHub'
             }
         }
 
         stage('Build') {
             steps {
-                echo '=== MAVEN BUILD ==='
                 sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Test') {
             steps {
-                echo '=== RUNNING TESTS ==='
                 sh 'mvn test'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo '=== SONARQUBE ANALYSIS ==='
-
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([
                         string(
@@ -46,9 +37,10 @@ pipeline {
                         )
                     ]) {
                         sh '''
-                            mvn sonar:sonar \
+                            mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar \
                             -Dsonar.projectKey=${SONAR_PROJECT} \
                             -Dsonar.projectName=${SONAR_PROJECT} \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.token=${SONAR_TOKEN}
                         '''
                     }
@@ -58,18 +50,12 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo '=== DOCKER IMAGE BUILD ==='
-
-                sh '''
-                    docker build -t ${DOCKER_IMAGE}:latest .
-                '''
+                sh 'docker build -t ${DOCKER_IMAGE}:latest .'
             }
         }
 
         stage('Docker Push') {
             steps {
-                echo '=== PUSHING IMAGE TO DOCKER HUB ==='
-
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-credentials',
@@ -78,12 +64,8 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                        echo "$DOCKER_PASSWORD" | docker login \
-                            --username "$DOCKER_USER" \
-                            --password-stdin
-
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
                         docker push ${DOCKER_IMAGE}:latest
-
                         docker logout
                     '''
                 }
@@ -92,36 +74,30 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                echo '=== DEPLOYING CONTAINER TO EC2 ==='
-
-                sh '''
-                    docker pull ${DOCKER_IMAGE}:latest
-
-                    docker rm -f financial-app || true
-
-                    docker run -d \
-                        --name financial-app \
-                        -p 8080:8080 \
-                        ${DOCKER_IMAGE}:latest
-
-                    echo "=== CONTAINER STATUS ==="
-                    docker ps
-                '''
+                sshagent(['ec2-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ubuntu@18.144.219.55 "
+                            docker pull ${DOCKER_IMAGE}:latest &&
+                            docker stop financial-app || true &&
+                            docker rm financial-app || true &&
+                            docker run -d \
+                            --name financial-app \
+                            -p 8080:8080 \
+                            ${DOCKER_IMAGE}:latest
+                        "
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo '========================================'
-            echo '       CI/CD PIPELINE SUCCESSFUL'
-            echo '========================================'
+            echo 'CI/CD PIPELINE SUCCESSFUL'
         }
 
         failure {
-            echo '========================================'
-            echo '        CI/CD PIPELINE FAILED'
-            echo '========================================'
+            echo 'CI/CD PIPELINE FAILED'
         }
     }
 }
