@@ -1,6 +1,11 @@
+```groovy
 pipeline {
 
     agent any
+
+    options {
+        skipDefaultCheckout(true)
+    }
 
     environment {
         DOCKER_IMAGE = 'karthik7756/financial-transaction-app'
@@ -35,18 +40,26 @@ pipeline {
                 echo '=== SONARQUBE ANALYSIS ==='
 
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=${SONAR_PROJECT} \
-                        -Dsonar.projectName=${SONAR_PROJECT}
-                    '''
+                    withCredentials([
+                        string(
+                            credentialsId: 'sonar-token',
+                            variable: 'SONAR_TOKEN'
+                        )
+                    ]) {
+                        sh '''
+                            mvn sonar:sonar \
+                            -Dsonar.projectKey=${SONAR_PROJECT} \
+                            -Dsonar.projectName=${SONAR_PROJECT} \
+                            -Dsonar.token=${SONAR_TOKEN}
+                        '''
+                    }
                 }
             }
         }
 
         stage('Docker Build') {
             steps {
-                echo '=== DOCKER BUILD ==='
+                echo '=== DOCKER IMAGE BUILD ==='
 
                 sh '''
                     docker build -t ${DOCKER_IMAGE}:latest .
@@ -56,7 +69,7 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                echo '=== DOCKER HUB PUSH ==='
+                echo '=== PUSHING IMAGE TO DOCKER HUB ==='
 
                 withCredentials([
                     usernamePassword(
@@ -65,7 +78,6 @@ pipeline {
                         passwordVariable: 'DOCKER_PASSWORD'
                     )
                 ]) {
-
                     sh '''
                         echo "$DOCKER_PASSWORD" | docker login \
                             --username "$DOCKER_USER" \
@@ -81,7 +93,7 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                echo '=== DEPLOYING CONTAINER ON EC2 ==='
+                echo '=== DEPLOYING CONTAINER TO EC2 ==='
 
                 sh '''
                     docker pull ${DOCKER_IMAGE}:latest
@@ -95,15 +107,12 @@ pipeline {
 
                     echo "=== CONTAINER STATUS ==="
                     docker ps
-
-                    echo "=== DEPLOYMENT COMPLETED ==="
                 '''
             }
         }
     }
 
     post {
-
         success {
             echo '========================================'
             echo '       CI/CD PIPELINE SUCCESSFUL'
@@ -117,3 +126,4 @@ pipeline {
         }
     }
 }
+```
