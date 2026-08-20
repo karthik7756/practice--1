@@ -11,28 +11,28 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Checking out source code from GitHub'
+                echo '=== CHECKOUT FROM GITHUB ==='
                 checkout scm
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Building Spring Boot application'
+                echo '=== MAVEN BUILD ==='
                 sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Running unit tests'
+                echo '=== RUNNING TESTS ==='
                 sh 'mvn test'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube analysis'
+                echo '=== SONARQUBE ANALYSIS ==='
 
                 withSonarQubeEnv('SonarQube') {
                     sh '''
@@ -46,18 +46,17 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo 'Building Docker image'
+                echo '=== DOCKER BUILD ==='
 
                 sh '''
-                    docker build \
-                    -t ${DOCKER_IMAGE}:latest .
+                    docker build -t ${DOCKER_IMAGE}:latest .
                 '''
             }
         }
 
         stage('Docker Push') {
             steps {
-                echo 'Pushing Docker image to DockerHub'
+                echo '=== DOCKER HUB PUSH ==='
 
                 withCredentials([
                     usernamePassword(
@@ -68,10 +67,9 @@ pipeline {
                 ]) {
 
                     sh '''
-                        echo "$DOCKER_PASSWORD" | \
-                        docker login \
-                        -u "$DOCKER_USER" \
-                        --password-stdin
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            --username "$DOCKER_USER" \
+                            --password-stdin
 
                         docker push ${DOCKER_IMAGE}:latest
 
@@ -83,21 +81,22 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                echo 'Deploying Docker container on EC2'
+                echo '=== DEPLOYING CONTAINER ON EC2 ==='
 
                 sh '''
                     docker pull ${DOCKER_IMAGE}:latest
 
-                    docker stop financial-app || true
-
-                    docker rm financial-app || true
+                    docker rm -f financial-app || true
 
                     docker run -d \
-                    --name financial-app \
-                    -p 8080:8080 \
-                    ${DOCKER_IMAGE}:latest
+                        --name financial-app \
+                        -p 8080:8080 \
+                        ${DOCKER_IMAGE}:latest
 
+                    echo "=== CONTAINER STATUS ==="
                     docker ps
+
+                    echo "=== DEPLOYMENT COMPLETED ==="
                 '''
             }
         }
@@ -106,17 +105,15 @@ pipeline {
     post {
 
         success {
-            echo '======================================'
-            echo 'CI/CD PIPELINE SUCCESSFUL'
-            echo 'Application deployed successfully'
-            echo '======================================'
+            echo '========================================'
+            echo '       CI/CD PIPELINE SUCCESSFUL'
+            echo '========================================'
         }
 
         failure {
-            echo '======================================'
-            echo 'CI/CD PIPELINE FAILED'
-            echo 'Check the Console Output for the error'
-            echo '======================================'
+            echo '========================================'
+            echo '        CI/CD PIPELINE FAILED'
+            echo '========================================'
         }
     }
-}    
+}
