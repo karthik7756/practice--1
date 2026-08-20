@@ -1,0 +1,7 @@
+services:
+  financial-app:
+    build: .
+    container_name: financial-app
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
