@@ -22,6 +22,14 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar -Dsonar.projectKey=financial-transaction-app -Dsonar.projectName=financial-transaction-app'
+                }
+            }
+        }
+
     }
 
     post {
@@ -33,4 +41,4 @@ pipeline {
             echo 'BUILD FAILED'
         }
     }
-} 
+}
