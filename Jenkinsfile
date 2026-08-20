@@ -11,27 +11,32 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Source code checked out from GitHub'
+                echo 'Checking out source code from GitHub'
+                checkout scm
             }
         }
 
         stage('Build') {
             steps {
+                echo 'Building Spring Boot application'
                 sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Test') {
             steps {
+                echo 'Running unit tests'
                 sh 'mvn test'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
+                echo 'Running SonarQube analysis'
+
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                        mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                        mvn sonar:sonar \
                         -Dsonar.projectKey=${SONAR_PROJECT} \
                         -Dsonar.projectName=${SONAR_PROJECT}
                     '''
@@ -41,12 +46,19 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t ${DOCKER_IMAGE}:latest .'
+                echo 'Building Docker image'
+
+                sh '''
+                    docker build \
+                    -t ${DOCKER_IMAGE}:latest .
+                '''
             }
         }
 
         stage('Docker Push') {
             steps {
+                echo 'Pushing Docker image to DockerHub'
+
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-credentials',
@@ -54,9 +66,15 @@ pipeline {
                         passwordVariable: 'DOCKER_PASSWORD'
                     )
                 ]) {
+
                     sh '''
-                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+                        echo "$DOCKER_PASSWORD" | \
+                        docker login \
+                        -u "$DOCKER_USER" \
+                        --password-stdin
+
                         docker push ${DOCKER_IMAGE}:latest
+
                         docker logout
                     '''
                 }
@@ -65,30 +83,40 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@YOUR_EC2_PUBLIC_IP "
-                            docker pull ${DOCKER_IMAGE}:latest &&
-                            docker stop financial-app || true &&
-                            docker rm financial-app || true &&
-                            docker run -d \
-                            --name financial-app \
-                            -p 8080:8080 \
-                            ${DOCKER_IMAGE}:latest
-                        "
-                    '''
-                }
+                echo 'Deploying Docker container on EC2'
+
+                sh '''
+                    docker pull ${DOCKER_IMAGE}:latest
+
+                    docker stop financial-app || true
+
+                    docker rm financial-app || true
+
+                    docker run -d \
+                    --name financial-app \
+                    -p 8080:8080 \
+                    ${DOCKER_IMAGE}:latest
+
+                    docker ps
+                '''
             }
         }
     }
 
     post {
+
         success {
+            echo '======================================'
             echo 'CI/CD PIPELINE SUCCESSFUL'
+            echo 'Application deployed successfully'
+            echo '======================================'
         }
 
         failure {
+            echo '======================================'
             echo 'CI/CD PIPELINE FAILED'
+            echo 'Check the Console Output for the error'
+            echo '======================================'
         }
     }
-}
+}    
