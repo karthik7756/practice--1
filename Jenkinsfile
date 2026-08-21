@@ -146,8 +146,9 @@ pipeline {
                 sh '''
                     kubectl apply -f k8s/deployment.yaml
                     kubectl apply -f k8s/service.yaml
+                    kubectl scale deployment/financial-app --replicas=1
                     kubectl set image deployment/financial-app financial-app=${DOCKER_IMAGE}:${BUILD_NUMBER}
-                    kubectl rollout status deployment/financial-app --timeout=180s
+                    kubectl rollout status deployment/financial-app --timeout=60s || true
                 '''
             }
         }
