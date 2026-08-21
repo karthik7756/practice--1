@@ -7,7 +7,6 @@ pipeline {
 
     environment {
         DOCKER_IMAGE        = 'karthik7756/financial-transaction-app'
-        SCANNER_HOME        = tool 'SonarScanner'
         NEXUS_VERSION       = 'nexus3'
         NEXUS_PROTOCOL      = 'http'
         NEXUS_URL           = '54.176.45.136:8081'
