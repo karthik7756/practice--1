@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE   = "practice1/financial-transaction-app"
+        DOCKER_IMAGE   = "karthik7756/financial-transaction-app"
         SONAR_SERVER   = "sonar"
         NEXUS_IP       = "18.145.216.95:8081"
         NEXUS_REPO     = "maven-releases"
