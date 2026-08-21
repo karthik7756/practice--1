@@ -134,7 +134,7 @@ pipeline {
                     if [ -f ansible/deploy-config.yml ]; then
                         ansible-playbook -i localhost, -c local ansible/deploy-config.yml || true
                     else
-                        echo "Ansible playbook not found, verifying kubectl directly:"
+                        echo "Ansible playbook not found, checking cluster connectivity:"
                         kubectl cluster-info
                     fi
                 '''
@@ -144,9 +144,9 @@ pipeline {
         stage('11. Kubernetes: Deploy to EKS') {
             steps {
                 sh '''
-                    sed -i "s|${DOCKER_IMAGE}:.*|${DOCKER_IMAGE}:${BUILD_NUMBER}|g" k8s/deployment.yaml
                     kubectl apply -f k8s/deployment.yaml
                     kubectl apply -f k8s/service.yaml
+                    kubectl set image deployment/financial-app financial-app=${DOCKER_IMAGE}:${BUILD_NUMBER}
                     kubectl rollout status deployment/financial-app --timeout=180s
                 '''
             }
