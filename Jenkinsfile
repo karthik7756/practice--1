@@ -24,7 +24,7 @@ pipeline {
         stage('3. SonarQube Scan') {
             steps {
                 withSonarQubeEnv("${SONAR_SERVER}") {
-                    sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=financial-transaction-app'
+                    sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=financial-transaction-app'
                 }
             }
         }
@@ -42,6 +42,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                     sh '''
                         JAR_FILE=$(find target -name "*.jar" ! -name "*sources*" | head -n 1)
+                        echo "Uploading ${JAR_FILE} to Nexus..."
                         curl -v -f -u ${NEXUS_USER}:${NEXUS_PASS} --upload-file ${JAR_FILE} \
                         "http://${NEXUS_IP}/repository/${NEXUS_REPO}/com/financial/financial-app/${BUILD_NUMBER}/financial-app-${BUILD_NUMBER}.jar"
                     '''
