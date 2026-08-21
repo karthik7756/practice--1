@@ -1,103 +1,66 @@
 pipeline {
-
     agent any
 
     environment {
-        DOCKER_IMAGE = 'karthik7756/financial-transaction-app'
-        SONAR_PROJECT = 'financial-transaction-app'
+        DOCKER_IMAGE   = "practice1/financial-transaction-app"
+        SONAR_SERVER   = "sonar"
+        NEXUS_IP       = "18.145.216.95:8081"
+        NEXUS_REPO     = "maven-releases"
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('1. Checkout SCM') {
             steps {
-                echo 'Checking out source code from GitHub'
+                checkout scm
             }
         }
 
-        stage('Build') {
+        stage('2. Maven Build') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn clean package -DskipTests=false'
             }
         }
 
-        stage('Test') {
+        stage('3. SonarQube Scan') {
             steps {
-                sh 'mvn test'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    withCredentials([
-                        string(
-                            credentialsId: 'sonar-token',
-                            variable: 'SONAR_TOKEN'
-                        )
-                    ]) {
-                        sh '''
-                            mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar \
-                            -Dsonar.projectKey=${SONAR_PROJECT} \
-                            -Dsonar.projectName=${SONAR_PROJECT} \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.token=${SONAR_TOKEN}
-                        '''
-                    }
+                withSonarQubeEnv("${SONAR_SERVER}") {
+                    sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=financial-transaction-app'
                 }
             }
         }
 
-        stage('Docker Build') {
+        stage('4. SonarQube Quality Gate') {
             steps {
-                sh 'docker build -t ${DOCKER_IMAGE}:latest .'
+                timeout(time: 3, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
-        stage('Docker Push') {
+        stage('5. Upload to Nexus') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                    sh '''
+                        JAR_FILE=$(find target -name "*.jar" ! -name "*sources*" | head -n 1)
+                        curl -v -f -u ${NEXUS_USER}:${NEXUS_PASS} --upload-file ${JAR_FILE} \
+                        "http://${NEXUS_IP}/repository/${NEXUS_REPO}/com/financial/financial-app/${BUILD_NUMBER}/financial-app-${BUILD_NUMBER}.jar"
+                    '''
+                }
+            }
+        }
+
+        stage('6. Docker Build & Push') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWORD')]) {
                     sh '''
                         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest .
+                        docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
                         docker push ${DOCKER_IMAGE}:latest
                         docker logout
                     '''
                 }
             }
-        }
-
-        stage('Deploy to EC2') {
-            steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@18.144.219.55 "
-                            docker pull ${DOCKER_IMAGE}:latest &&
-                            docker stop financial-app || true &&
-                            docker rm financial-app || true &&
-                            docker run -d \
-                            --name financial-app \
-                            -p 8080:8080 \
-                            ${DOCKER_IMAGE}:latest
-                        "
-                    '''
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'CI/CD PIPELINE SUCCESSFUL'
-        }
-
-        failure {
-            echo 'CI/CD PIPELINE FAILED'
         }
     }
 }
