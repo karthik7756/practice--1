@@ -1,0 +1,11 @@
+---
+- name: Prepare Node and Verify Cluster
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Verify Kubernetes cluster status
+      command: kubectl cluster-info
+      register: k8s_status
+    - name: Print cluster information
+      debug:
+        msg: "{{ k8s_status.stdout }}"

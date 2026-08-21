@@ -2,8 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: financial-app
+  labels:
+    app: financial-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: financial-app
@@ -13,19 +15,15 @@ spec:
         app: financial-app
     spec:
       containers:
-        - name: financial-app
-          image: YOUR_DOCKERHUB_USERNAME/financial-transaction-app:latest
-          ports:
-            - containerPort: 8080
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 20
+      - name: financial-app
+        image: karthik7756/financial-transaction-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"

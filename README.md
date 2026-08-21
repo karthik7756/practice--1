@@ -1,30 +1,22 @@
-# Financial Transaction Management System
+# Financial Transaction Service - DevSecOps on AWS EKS
 
-Demo financial transaction application for a DevSecOps project.
+An automated 11-stage CI/CD pipeline for a Java Spring Boot microservice deployed to Amazon EKS.
 
-## Features
-- Health endpoint
-- Account listing and lookup
-- Demo account-to-account transfer
-- Transaction history
-- H2 database
-- Docker, Jenkins and Kubernetes support
+## 🚀 Pipeline Stages
+1. **SCM Checkout**: GitHub master branch
+2. **Secret Scan**: Gitleaks
+3. **Build & Test**: Maven
+4. **Code Analysis**: SonarQube SAST
+5. **Quality Gate**: SonarQube Quality Gate
+6. **Artifact Storage**: Sonatype Nexus
+7. **Containerization**: Docker
+8. **Vulnerability Scan**: Trivy
+9. **Image Push**: Docker Hub
+10. **Config Prep**: Ansible
+11. **Kubernetes Deployment**: AWS EKS (LoadBalancer)
 
-## Stack
-Java 17, Spring Boot, Maven, H2, GitHub, Jenkins, SonarQube, OWASP Dependency-Check, Nexus, Docker, Trivy, Kubernetes, AWS EC2, Prometheus and Grafana.
-
-## Run
-mvn clean package
-mvn spring-boot:run
-
-Endpoints:
-GET /api/health
-GET /api/accounts
-GET /api/accounts/{accountNumber}
-POST /api/transactions/transfer
-GET /api/transactions/history/{accountNumber}
-
-Transfer JSON:
-{"fromAccount":"100001","toAccount":"100002","amount":5000}
-
-This is a learning/demo application. It does not process real money or connect to banking/payment networks.
+## 🛠️ Tools Used
+- AWS (EKS, EC2, ELB)
+- Jenkins, Docker, Kubernetes
+- SonarQube, Nexus, Gitleaks, Trivy, Ansible
+- Java, Spring Boot, Maven
