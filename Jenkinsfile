@@ -147,7 +147,7 @@ pipeline {
                     sed -i "s|${DOCKER_IMAGE}:.*|${DOCKER_IMAGE}:${BUILD_NUMBER}|g" k8s/deployment.yaml
                     kubectl apply -f k8s/deployment.yaml
                     kubectl apply -f k8s/service.yaml
-                    kubectl rollout status deployment/financial-app-deployment --timeout=180s
+                    kubectl rollout status deployment/financial-app --timeout=180s
                 '''
             }
         }
