@@ -15,13 +15,19 @@ pipeline {
             }
         }
 
-        stage('2. Maven Build') {
+        stage('2. Security: Gitleaks Secret Scan') {
+            steps {
+                sh 'gitleaks detect --verbose --no-git --source . || true'
+            }
+        }
+
+        stage('3. Maven Build & Unit Tests') {
             steps {
                 sh 'mvn clean package -DskipTests=false'
             }
         }
 
-        stage('3. SonarQube Scan') {
+        stage('4. SAST: SonarQube Code Analysis') {
             steps {
                 withSonarQubeEnv("${SONAR_SERVER}") {
                     sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=financial-transaction-app'
@@ -29,7 +35,7 @@ pipeline {
             }
         }
 
-        stage('4. SonarQube Quality Gate') {
+        stage('5. SonarQube Quality Gate') {
             steps {
                 timeout(time: 3, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -37,7 +43,7 @@ pipeline {
             }
         }
 
-        stage('5. Upload to Nexus') {
+        stage('6. Upload Artifact to Nexus') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                     sh '''
@@ -50,18 +56,35 @@ pipeline {
             }
         }
 
-        stage('6. Docker Build & Push') {
+        stage('7. Docker Build') {
+            steps {
+                sh 'docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest .'
+            }
+        }
+
+        stage('8. Security: Trivy Container Scan') {
+            steps {
+                sh 'trivy image --severity HIGH,CRITICAL --exit-code 0 ${DOCKER_IMAGE}:${BUILD_NUMBER}'
+            }
+        }
+
+        stage('9. Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWORD')]) {
                     sh '''
                         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest .
                         docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
                         docker push ${DOCKER_IMAGE}:latest
                         docker logout
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build, Gitleaks, SonarQube, Nexus, Trivy, and Docker Push Succeeded!'
         }
     }
 }
